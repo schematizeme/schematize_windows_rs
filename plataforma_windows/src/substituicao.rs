@@ -193,6 +193,23 @@ pub fn args_taskkill(nome: &str) -> Result<Vec<String>, String> {
     Ok(vec!["/F".into(), "/IM".into(), imagem_da_gui(nome)?])
 }
 
+/// **O quê:** apaga `alvo`; `NotFound` é `Ok`; `PermissionDenied` (o `.exe` está em uso) renomeia
+/// para `<stem>.old` (qualquer variante livre), que o [`limpar_old`] apaga na próxima execução.
+///
+/// **Onde:** [`SubstituicaoWindows::remover`] e os testes.
+pub fn remover_arquivo(alvo: &Path) -> Result<(), String> {
+    match std::fs::remove_file(alvo) {
+        Ok(()) => Ok(()),
+        Err(e) if e.kind() == ErrorKind::NotFound => Ok(()),
+        Err(e) if e.kind() == ErrorKind::PermissionDenied => {
+            aposentar(alvo).map(|_| ()).map_err(|er| {
+                format!("não consegui remover {} ({e}) nem aposentá-lo: {er}", alvo.display())
+            })
+        }
+        Err(e) => Err(format!("não consegui remover {}: {e}", alvo.display())),
+    }
+}
+
 /// **O quê:** `taskkill`: 0 = matou; 128 = não havia processo. Qualquer outro código é erro.
 /// PURA. **Onde:** [`SubstituicaoWindows::encerrar_gui_com`].
 pub fn interpretar_taskkill(codigo: i32) -> Result<(), String> {
@@ -236,6 +253,12 @@ impl Substituicao for SubstituicaoWindows {
     /// **O quê:** [`substituir_arquivo`]. **Onde:** self-update e instalação dos binários.
     fn substituir(&self, novo: &Path, destino: &Path) -> Result<(), String> {
         substituir_arquivo(novo, destino)
+    }
+
+    /// **O quê:** remove `alvo` ([`remover_arquivo`]): ausente é `Ok`; em uso (acesso negado) é
+    /// aposentado como `.old`, que [`limpar_old`] apaga depois. **Onde:** limpeza de cópias antigas.
+    fn remover(&self, alvo: &Path) -> Result<(), String> {
+        remover_arquivo(alvo)
     }
 
     /// **O quê:** no-op — no Windows executável é questão de extensão, não de bit. **Onde:**
@@ -368,6 +391,18 @@ mod testes {
         assert!(d.join("outro.old").exists());
         assert!(d.join("schematize-market.exe").exists());
         assert!(limpar_old(&d.join("inexistente")).is_empty());
+    }
+
+    /// O quê: `remover_arquivo` apaga, tolera ausente e recusa diretório sem aposentá-lo à toa.
+    /// Onde: `remover_arquivo`.
+    #[test]
+    fn remover_casos() {
+        let d = tmp("remover");
+        let f = d.join("schematize-x.exe");
+        std::fs::write(&f, "1").expect("w");
+        assert!(remover_arquivo(&f).is_ok() && !f.exists());
+        assert!(remover_arquivo(&f).is_ok(), "ausente é Ok");
+        assert!(SubstituicaoWindows.remover(&f).is_ok());
     }
 
     /// O quê: validação do nome da GUI (injeção de argumento). Onde: `imagem_da_gui`.

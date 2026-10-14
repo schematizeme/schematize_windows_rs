@@ -38,11 +38,30 @@ fn enable_idempotente_disable_remove() {
     settings::enable(&h).expect("enable 1");
     settings::enable(&h).expect("enable 2");
     let j = ler();
-    assert_eq!(grupos(&j, "Stop", "overdev check"), 1, "duplicou o Stop: {j}");
-    assert_eq!(grupos(&j, "PreToolUse", "overdev guard"), 1, "duplicou o guard: {j}");
-    assert!(settings::overdev_enabled());
+    assert_eq!(grupos(&j, "Stop", "schematize-overdev"), 1, "duplicou o Stop: {j}");
+    assert_eq!(grupos(&j, "PreToolUse", "schematize-overdev"), 1, "duplicou o guard: {j}");
+    assert!(settings::overdev_enabled(&h));
     assert!(settings::hooks_atualizados(&h));
     assert!(!settings::refresh_hooks(&h).expect("refresh"), "já atualizado: não regrava");
+
+    // Migração das formas ANTIGAS (sem .exe; entre aspas com `\`): enable troca, não duplica.
+    for velho in [
+        r#"C:/Users/ana/.cargo/bin/schematize-overdev check"#,
+        r#""C:\Users\ana\.cargo\bin\schematize-overdev.exe" check"#,
+    ] {
+        std::fs::write(
+            &arq,
+            serde_json::json!({"hooks":{"Stop":[{"hooks":[{"type":"command","command":velho}]}]}})
+                .to_string(),
+        )
+        .expect("settings antigo");
+        assert!(settings::overdev_enabled(&h), "forma antiga deve ser reconhecida: {velho}");
+        assert!(!settings::hooks_atualizados(&h));
+        settings::enable(&h).expect("enable migra");
+        let j = ler();
+        assert_eq!(grupos(&j, "Stop", "schematize-overdev"), 1, "duplicou ({velho}): {j}");
+        assert_eq!(grupos(&j, "Stop", &h.comando("check")), 1, "{j}");
+    }
 
     // Migração: o hook de um caminho antigo (outro HOME) é SUBSTITUÍDO, não duplicado.
     let velho = HooksWindows::com_dir(Some(Path::new("D:\\Old\\bin")));
@@ -50,15 +69,15 @@ fn enable_idempotente_disable_remove() {
     assert!(!settings::hooks_atualizados(&h));
     assert!(settings::refresh_hooks(&h).expect("refresh"), "deve regravar");
     let j = ler();
-    assert_eq!(grupos(&j, "Stop", "overdev check"), 1, "{j}");
+    assert_eq!(grupos(&j, "Stop", "schematize-overdev"), 1, "{j}");
     assert_eq!(grupos(&j, "Stop", &h.comando("check")), 1, "{j}");
     assert_eq!(grupos(&j, "Stop", "D:/Old"), 0, "{j}");
 
-    settings::disable().expect("disable");
+    settings::disable(&h).expect("disable");
     let j = ler();
-    assert_eq!(grupos(&j, "Stop", "overdev check"), 0, "{j}");
-    assert_eq!(grupos(&j, "PreToolUse", "overdev guard"), 0, "{j}");
-    assert!(!settings::overdev_enabled());
+    assert_eq!(grupos(&j, "Stop", "schematize-overdev"), 0, "{j}");
+    assert_eq!(grupos(&j, "PreToolUse", "schematize-overdev"), 0, "{j}");
+    assert!(!settings::overdev_enabled(&h));
 
     // Hook alheio no mesmo arquivo sobrevive a enable + disable.
     std::fs::write(
@@ -67,7 +86,7 @@ fn enable_idempotente_disable_remove() {
     )
     .expect("settings alheio");
     settings::enable(&h).expect("enable");
-    settings::disable().expect("disable");
+    settings::disable(&h).expect("disable");
     assert_eq!(grupos(&ler(), "Stop", "meu-hook"), 1);
     std::fs::remove_dir_all(&home).expect("limpar");
 }

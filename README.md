@@ -54,9 +54,10 @@ PowerShell 5.1 ou 7. Abra um terminal novo depois.
 - **cwd de outro processo:** o Windows não o expõe sem API privilegiada. `Processos::em_dir` e
   `pids_por_argv_em` aproximam por "a linha de comando cita o diretório" (falso negativo possível,
   nunca falso positivo). `carga1` é sempre `None` (não há load average).
-- **Hook do overdev:** o comando é `C:/Users/<u>/.cargo/bin/schematize-overdev check` — sem
-  aspas e sem `.exe` de propósito (ver o doc de `overdev_windows`). Se o caminho tem espaço, cai
-  em `schematize-overdev check` pelo PATH.
+- **Hook do overdev:** o comando é `C:/Users/<u>/.cargo/bin/schematize-overdev.exe check` — caminho
+  absoluto com `/`, sem aspas (a única forma textual idêntica que roda em Git Bash, cmd e
+  PowerShell; ver o doc de `overdev_windows`). Com espaço no caminho, cai em
+  `schematize-overdev.exe check` pelo PATH.
 - **Terminal sem Git Bash:** scripts além do `exec <cmd>` simples pedem o Git for Windows
   (`winget install --id Git.Git -e`).
 - **Windows ARM64:** roda os `.exe` x64 por emulação (não há build nativo ainda).
@@ -77,7 +78,7 @@ cargo build --release --features bins/gui
 
 As dependências `schematize_plataforma`, `schematize-market` e `schematize-overdev` estão como
 `path = "../…"` com a marca `# TEMP(ADR-0026): trocar por git + tag ao publicar`
-(plataforma `v0.2.1`, market `v0.6.0`, overdev `v0.4.0`). O CI clona os irmãos nessas tags
+(plataforma `v0.2.2`, market `v0.6.0`, overdev `v0.4.0`). O CI clona os irmãos nessas tags
 (`.github/scripts/clonar-irmaos.sh`, também TEMP).
 
 ## Release

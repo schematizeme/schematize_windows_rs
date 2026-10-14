@@ -141,11 +141,11 @@ jobs:
           & $exe enable; if ($LASTEXITCODE -ne 0) { throw "enable (2x) falhou ($LASTEXITCODE)" }
           $arq = Join-Path $casa '.claude\settings.json'
           $j = Get-Content -Raw -LiteralPath $arq | ConvertFrom-Json
-          $stop = @($j.hooks.Stop | Where-Object { $_.hooks[0].command -like '*overdev check*' })
+          $stop = @($j.hooks.Stop | Where-Object { $_.hooks[0].command -like '*schematize-overdev*check' })
           if ($stop.Count -ne 1) { throw "Stop duplicado ou ausente: $($stop.Count)" }
           $cmd = $stop[0].hooks[0].command
           Write-Host "comando do hook: $cmd"
-          if ($cmd -notmatch 'overdev check') { throw 'o comando perdeu a marca "overdev check"' }
+          if ($cmd -notmatch 'schematize-overdev\.exe check$') { throw "forma inesperada do comando: $cmd" }
           # 1) cmd
           cmd /c $cmd
           if ($LASTEXITCODE -ne 0) { throw "hook via cmd saiu com $LASTEXITCODE" }
@@ -160,7 +160,7 @@ jobs:
           # disable remove tudo
           & $exe disable; if ($LASTEXITCODE -ne 0) { throw "disable falhou" }
           $j = Get-Content -Raw -LiteralPath $arq | ConvertFrom-Json
-          $resto = @($j.hooks.Stop | Where-Object { $_ -and $_.hooks[0].command -like '*overdev check*' })
+          $resto = @($j.hooks.Stop | Where-Object { $_ -and $_.hooks[0].command -like '*schematize-overdev*check' })
           if ($resto.Count -ne 0) { throw 'disable deixou o hook para trás' }
       - name: delegar --listar --json é JSON
         shell: powershell

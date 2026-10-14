@@ -19,10 +19,12 @@
 //! | `PathSetup` | `HKCU\Environment\Path` (idempotente) + `WM_SETTINGCHANGE` |
 //! | `Terminal` | `wt.exe` ou `cmd /c start`; script bash roda no Git Bash |
 //! | `Abridor` | `explorer.exe <alvo>` (sem shell no meio) |
+//! | `Caminhos` | `;`, extras `~\.cargo\bin`… e fallback com o OpenSSH do Windows |
 //! | `Processos` | `Get-CimInstance Win32_Process` + `tasklist` |
 
 pub mod abridor;
 pub mod atalhos;
+pub mod caminhos;
 pub mod dirs;
 pub mod exec;
 pub mod ico;
@@ -44,16 +46,17 @@ use schematize_plataforma::seams::Plataforma;
 /// a regra órfã proíbe `impl` inerente de tipo alheio — por isso o trait de extensão.)
 pub fn plataforma_windows() -> Plataforma {
     limpar_olds_do_exe_atual();
-    Plataforma {
-        shell: Box::new(shell::ShellWindows),
-        rede: Box::new(rede::RedeWindows),
-        substituicao: Box::new(substituicao::SubstituicaoWindows),
-        atalhos: Box::new(atalhos::AtalhosWindows),
-        path: Box::new(pathsetup::PathSetupWindows),
-        terminal: Box::new(terminal::TerminalWindows),
-        abridor: Box::new(abridor::AbridorWindows),
-        processos: Box::new(processos::ProcessosWindows::real()),
-    }
+    Plataforma::nova(
+        Box::new(shell::ShellWindows),
+        Box::new(rede::RedeWindows),
+        Box::new(substituicao::SubstituicaoWindows),
+        Box::new(atalhos::AtalhosWindows),
+        Box::new(pathsetup::PathSetupWindows),
+        Box::new(terminal::TerminalWindows),
+        Box::new(abridor::AbridorWindows),
+        Box::new(processos::ProcessosWindows::real()),
+    )
+    .com_caminhos(Box::new(caminhos::CaminhosWindows))
 }
 
 /// **O quê:** apaga os `schematize*.old` do diretório do executável em execução (a limpeza
@@ -97,5 +100,6 @@ mod testes {
         assert!(p.abridor.abrir("-x").is_err());
         assert!(p.substituicao.tornar_executavel(std::path::Path::new("x")).is_ok());
         assert_eq!(p.processos.carga1(), None);
+        assert_eq!(p.caminhos.separador_path(), ';');
     }
 }

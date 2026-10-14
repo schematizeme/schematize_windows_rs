@@ -24,6 +24,6 @@ clonar() {
   echo "ok: $repo @ $tag"
 }
 
-clonar schematize_plataforma_rs v0.2.1
+clonar schematize_plataforma_rs v0.2.2
 clonar schematize_market_rs v0.6.0
 clonar schematize_overdev_rs v0.4.0
