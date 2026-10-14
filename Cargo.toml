@@ -1,0 +1,15 @@
+[workspace]
+resolver = "2"
+members = ["plataforma_windows", "market_windows", "overdev_windows", "bins"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+repository = "https://github.com/schematizeme/schematize_windows_rs"
+
+# Mesmo perfil dos repos irmãos (ver schematize_market_rs): dependências comuns compilam uma vez.
+[profile.release]
+strip = true
+opt-level = 3
+lto = "thin"
