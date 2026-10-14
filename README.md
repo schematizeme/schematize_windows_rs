@@ -76,10 +76,8 @@ CC_x86_64_pc_windows_gnu=gcc AR_x86_64_pc_windows_gnu=ar \
 cargo build --release --features bins/gui
 ```
 
-As dependências `schematize_plataforma`, `schematize-market` e `schematize-overdev` estão como
-`path = "../…"` com a marca `# TEMP(ADR-0026): trocar por git + tag ao publicar`
-(plataforma `v0.2.2`, market `v0.6.0`, overdev `v0.4.0`). O CI clona os irmãos nessas tags
-(`.github/scripts/clonar-irmaos.sh`, também TEMP).
+As dependências `schematize_plataforma` (`v0.2.2`), `schematize-market` (`v0.6.0`) e `schematize-overdev`
+(`v0.4.0`) vêm por `git + tag` dos repos `schematizeme/*`.
 
 ## Release
 

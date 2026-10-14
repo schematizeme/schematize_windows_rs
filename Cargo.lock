@@ -2040,6 +2040,7 @@ dependencies = [
 [[package]]
 name = "schematize-market"
 version = "0.6.0"
+source = "git+https://github.com/schematizeme/schematize_market_rs?tag=v0.6.0#1e9ab55a41ae3c7b745987a0a6eff8fbe3b47daf"
 dependencies = [
  "clap",
  "libc",
@@ -2052,6 +2053,7 @@ dependencies = [
 [[package]]
 name = "schematize-overdev"
 version = "0.4.0"
+source = "git+https://github.com/schematizeme/schematize_overdev_rs?tag=v0.4.0#65d86063dcd403256694f85cec366a390a4911e7"
 dependencies = [
  "chrono",
  "clap",
@@ -2069,6 +2071,7 @@ dependencies = [
 [[package]]
 name = "schematize_plataforma"
 version = "0.2.2"
+source = "git+https://github.com/schematizeme/schematize_plataforma_rs?tag=v0.2.2#f25ba1d5c1a657537ff0d438549becd69e6cf9e6"
 
 [[package]]
 name = "scoped-tls"

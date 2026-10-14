@@ -6,10 +6,8 @@ license.workspace = true
 description = "HooksWindows: o impl de overdev_casa::hooks::Hooks para Windows."
 
 [dependencies]
-# TEMP(ADR-0026): trocar por git = "https://github.com/schematizeme/schematize_overdev_rs", tag = "v0.4.0" ao publicar
-overdev_casa = { package = "schematize-overdev", path = "../../schematize_overdev_rs", default-features = false }
-# TEMP(ADR-0026): trocar por git = "https://github.com/schematizeme/schematize_plataforma_rs", tag = "v0.2.2" ao publicar
-schematize_plataforma = { path = "../../schematize_plataforma_rs", features = ["base", "seams"] }
+overdev_casa = { package = "schematize-overdev", git = "https://github.com/schematizeme/schematize_overdev_rs", tag = "v0.4.0", default-features = false }
+schematize_plataforma = { git = "https://github.com/schematizeme/schematize_plataforma_rs", tag = "v0.2.2", features = ["base", "seams"] }
 
 [dev-dependencies]
 serde_json = "1"

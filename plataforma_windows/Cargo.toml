@@ -6,5 +6,4 @@ license.workspace = true
 description = "Adaptadores Windows (PowerShell/winget/COM) das costuras de schematize_plataforma (ADR-0026)."
 
 [dependencies]
-# TEMP(ADR-0026): trocar por git = "https://github.com/schematizeme/schematize_plataforma_rs", tag = "v0.2.2" ao publicar
-schematize_plataforma = { path = "../../schematize_plataforma_rs", features = ["base", "seams"] }
+schematize_plataforma = { git = "https://github.com/schematizeme/schematize_plataforma_rs", tag = "v0.2.2", features = ["base", "seams"] }

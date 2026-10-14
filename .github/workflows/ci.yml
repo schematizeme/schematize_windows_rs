@@ -24,11 +24,6 @@ jobs:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
         with:
           path: schematize_windows_rs
-      - name: Repos irmãos (TEMP ADR-0026)
-        shell: bash
-        env:
-          CI_READ_TOKEN: ${{ secrets.CI_READ_TOKEN }}
-        run: schematize_windows_rs/.github/scripts/clonar-irmaos.sh
       - name: Toolchain
         shell: bash
         run: |
@@ -65,10 +60,6 @@ jobs:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
         with:
           path: schematize_windows_rs
-      - name: Repos irmãos (TEMP ADR-0026)
-        env:
-          CI_READ_TOKEN: ${{ secrets.CI_READ_TOKEN }}
-        run: schematize_windows_rs/.github/scripts/clonar-irmaos.sh
       - name: Toolchain e mingw (cross-check do alvo Windows; o rusqlite compila C)
         run: |
           sudo apt-get update -qq
