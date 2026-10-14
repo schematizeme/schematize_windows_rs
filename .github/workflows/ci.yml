@@ -1,0 +1,89 @@
+name: ci
+
+# Windows: fmt + clippy -D warnings + test (os adaptadores rodam de verdade aqui).
+# Ubuntu: a lógica PURA (montar comando, parsear saída, decidir) e o cross-check para o alvo
+# Windows. As costuras são testadas no Linux porque a decisão é separada da execução.
+
+on:
+  push:
+    branches: [main]
+  pull_request: {}
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+  GIT_TERMINAL_PROMPT: "0"
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          path: schematize_windows_rs
+      - name: Repos irmãos (TEMP ADR-0026)
+        shell: bash
+        env:
+          CI_READ_TOKEN: ${{ secrets.CI_READ_TOKEN }}
+        run: schematize_windows_rs/.github/scripts/clonar-irmaos.sh
+      - name: Toolchain
+        shell: bash
+        run: |
+          rustup toolchain install stable --profile minimal -c rustfmt -c clippy
+          rustup default stable
+          rustc --version
+      - name: Sintaxe do install.ps1 (Windows PowerShell 5.1, sem Pester)
+        shell: powershell
+        working-directory: schematize_windows_rs
+        run: |
+          $erros = $null; $tokens = $null
+          $ast = [System.Management.Automation.Language.Parser]::ParseFile((Resolve-Path 'install.ps1'), [ref]$tokens, [ref]$erros)
+          if ($erros -and $erros.Count -gt 0) {
+            $erros | ForEach-Object { Write-Host "$($_.Extent.StartLineNumber):$($_.Extent.StartColumnNumber) $($_.Message)" }
+            exit 1
+          }
+          Write-Host "install.ps1: sintaxe OK ($($tokens.Count) tokens)"
+      - name: Formato
+        shell: bash
+        working-directory: schematize_windows_rs
+        run: cargo fmt --all -- --check
+      - name: Clippy (-D warnings)
+        shell: bash
+        working-directory: schematize_windows_rs
+        run: cargo clippy --workspace --all-targets --features bins/gui -- -D warnings
+      - name: Testes
+        shell: bash
+        working-directory: schematize_windows_rs
+        run: cargo test --workspace --features bins/gui
+
+  ubuntu:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          path: schematize_windows_rs
+      - name: Repos irmãos (TEMP ADR-0026)
+        env:
+          CI_READ_TOKEN: ${{ secrets.CI_READ_TOKEN }}
+        run: schematize_windows_rs/.github/scripts/clonar-irmaos.sh
+      - name: Toolchain e mingw (cross-check do alvo Windows; o rusqlite compila C)
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y gcc-mingw-w64-x86-64
+          rustup toolchain install stable --profile minimal -c rustfmt -c clippy
+          rustup default stable
+          rustup target add x86_64-pc-windows-gnu
+      - name: Lógica pura (clippy + testes no Linux)
+        working-directory: schematize_windows_rs
+        run: |
+          cargo clippy --workspace --all-targets -- -D warnings
+          cargo test --workspace
+      - name: Cross-check do alvo Windows (sem a janela)
+        working-directory: schematize_windows_rs
+        env:
+          CC_x86_64_pc_windows_gnu: x86_64-w64-mingw32-gcc
+          AR_x86_64_pc_windows_gnu: x86_64-w64-mingw32-ar
+        run: cargo check --target x86_64-pc-windows-gnu --workspace --all-targets

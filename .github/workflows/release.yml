@@ -1,0 +1,176 @@
+name: release-windows
+
+# Em tag `v*`: compila os 4 executáveis Windows, publica no release (com SHA256SUMS) e prova,
+# num Windows limpo, que o `install.ps1` instala e que o hook gerado funciona.
+#
+# Assets (nomes que o market e o install.ps1 esperam):
+#   schematize-market-windows-x86_64.exe        schematize-market-gui-windows-x86_64.exe
+#   schematize-overdev-windows-x86_64.exe       schematize-overdev-gui-windows-x86_64.exe
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+env:
+  CARGO_TERM_COLOR: always
+  GIT_TERMINAL_PROMPT: "0"
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          path: schematize_windows_rs
+      - name: Repos irmãos (TEMP ADR-0026)
+        shell: bash
+        env:
+          CI_READ_TOKEN: ${{ secrets.CI_READ_TOKEN }}
+        run: schematize_windows_rs/.github/scripts/clonar-irmaos.sh
+      - name: Toolchain
+        shell: bash
+        run: |
+          rustup toolchain install stable --profile minimal
+          rustup default stable
+          rustup target add x86_64-pc-windows-msvc
+      - name: Portão barato (fmt, clippy, testes)
+        shell: bash
+        working-directory: schematize_windows_rs
+        run: |
+          rustup component add rustfmt clippy
+          cargo fmt --all -- --check
+          cargo clippy --workspace --all-targets --features bins/gui -- -D warnings
+          cargo test --workspace --features bins/gui
+      - name: Build (release) — market, overdev e a janela do overdev
+        shell: bash
+        working-directory: schematize_windows_rs
+        run: cargo build --release --target x86_64-pc-windows-msvc --features bins/gui
+      # A JANELA do market, publicada AO LADO do binário (ADR-0014 D5): vive em repo próprio
+      # (`schematize-updater-gui`; o binário se chama schematize-market-gui). Best-effort: se não
+      # compilar, o release NÃO falha — o gestor headless é o que precisa chegar.
+      - name: Janela do market (opcional)
+        id: janela
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -euo pipefail
+          git clone --depth 1 https://github.com/schematizeme/schematize-updater-gui.git janela
+          cargo build --release --locked --manifest-path janela/Cargo.toml \
+            --target x86_64-pc-windows-msvc
+      - name: Nomear os assets e gerar o SHA256SUMS
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          alvo=schematize_windows_rs/target/x86_64-pc-windows-msvc/release
+          cp "$alvo/schematize-market.exe"       dist/schematize-market-windows-x86_64.exe
+          cp "$alvo/schematize-overdev.exe"      dist/schematize-overdev-windows-x86_64.exe
+          cp "$alvo/schematize-overdev-gui.exe"  dist/schematize-overdev-gui-windows-x86_64.exe
+          if [ "${{ steps.janela.outcome }}" = "success" ]; then
+            cp janela/target/x86_64-pc-windows-msvc/release/schematize-market-gui.exe \
+               dist/schematize-market-gui-windows-x86_64.exe
+          fi
+          cd dist
+          sha256sum *.exe > SHA256SUMS
+          cat SHA256SUMS
+      # Um .exe que baixa com HTTP 200 e não executa só falha na máquina de quem instalou.
+      - name: Os CLIs executam?
+        shell: bash
+        run: |
+          set -euo pipefail
+          ./dist/schematize-market-windows-x86_64.exe --version
+          ./dist/schematize-overdev-windows-x86_64.exe --version
+      - name: Publicar no release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          cd dist
+          gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1 \
+            || gh release create "$TAG" --repo "$GITHUB_REPOSITORY" --title "$TAG" --generate-notes
+          gh release upload "$TAG" --repo "$GITHUB_REPOSITORY" --clobber *.exe SHA256SUMS
+
+  # Windows LIMPO: instala como o usuário (install.ps1 DESTA tag), roda os exes, liga o hook do
+  # overdev num USERPROFILE temporário e executa o comando gerado por cmd, Git Bash e PowerShell.
+  e2e-windows:
+    needs: build
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          path: repo
+      - name: install.ps1 (do SHA da tag) contra o release recém-publicado
+        shell: powershell
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          $casa = Join-Path $env:RUNNER_TEMP 'home'
+          New-Item -ItemType Directory -Force -Path $casa | Out-Null
+          # Simula outro usuário: HOME/USERPROFILE temporários (nada toca o runner de verdade).
+          $env:USERPROFILE = $casa
+          $env:HOME = $casa
+          & (Join-Path $env:GITHUB_WORKSPACE 'repo\install.ps1') -Versao $env:TAG -SemPath
+          if (-not $?) { exit 1 }
+          $bin = Join-Path $casa '.cargo\bin'
+          foreach ($e in 'schematize-market', 'schematize-overdev') {
+            $v = & (Join-Path $bin "$e.exe") --version
+            if ($LASTEXITCODE -ne 0 -or -not $v) { throw "$e --version falhou" }
+            Write-Host "$e => $v"
+          }
+          $g = & (Join-Path $bin 'schematize-overdev-gui.exe') --version | Out-String
+          if ($g -notmatch 'schematize-overdev-gui') { throw "overdev-gui --version inesperado: $g" }
+          Write-Host "gui => $g"
+          Add-Content -Path $env:GITHUB_ENV -Value "E2E_HOME=$casa"
+      - name: Hook do overdev — enable idempotente e comando executável em cmd, Git Bash e PowerShell
+        shell: powershell
+        run: |
+          $casa = $env:E2E_HOME
+          $env:USERPROFILE = $casa
+          $env:HOME = $casa
+          $exe = Join-Path $casa '.cargo\bin\schematize-overdev.exe'
+          $proj = Join-Path $env:RUNNER_TEMP 'proj'
+          New-Item -ItemType Directory -Force -Path $proj | Out-Null
+          Set-Location $proj
+          & $exe enable; if ($LASTEXITCODE -ne 0) { throw "enable falhou ($LASTEXITCODE)" }
+          & $exe enable; if ($LASTEXITCODE -ne 0) { throw "enable (2x) falhou ($LASTEXITCODE)" }
+          $arq = Join-Path $casa '.claude\settings.json'
+          $j = Get-Content -Raw -LiteralPath $arq | ConvertFrom-Json
+          $stop = @($j.hooks.Stop | Where-Object { $_.hooks[0].command -like '*overdev check*' })
+          if ($stop.Count -ne 1) { throw "Stop duplicado ou ausente: $($stop.Count)" }
+          $cmd = $stop[0].hooks[0].command
+          Write-Host "comando do hook: $cmd"
+          if ($cmd -notmatch 'overdev check') { throw 'o comando perdeu a marca "overdev check"' }
+          # 1) cmd
+          cmd /c $cmd
+          if ($LASTEXITCODE -ne 0) { throw "hook via cmd saiu com $LASTEXITCODE" }
+          # 2) PowerShell (filho)
+          powershell -NoProfile -NonInteractive -Command $cmd
+          if ($LASTEXITCODE -ne 0) { throw "hook via PowerShell saiu com $LASTEXITCODE" }
+          # 3) Git Bash (é assim que o Claude Code roda hooks no Windows)
+          $bash = Join-Path ${env:ProgramFiles} 'Git\bin\bash.exe'
+          if (-not (Test-Path $bash)) { throw "Git Bash não encontrado em $bash" }
+          & $bash -c $cmd
+          if ($LASTEXITCODE -ne 0) { throw "hook via Git Bash saiu com $LASTEXITCODE" }
+          # disable remove tudo
+          & $exe disable; if ($LASTEXITCODE -ne 0) { throw "disable falhou" }
+          $j = Get-Content -Raw -LiteralPath $arq | ConvertFrom-Json
+          $resto = @($j.hooks.Stop | Where-Object { $_ -and $_.hooks[0].command -like '*overdev check*' })
+          if ($resto.Count -ne 0) { throw 'disable deixou o hook para trás' }
+      - name: delegar --listar --json é JSON
+        shell: powershell
+        run: |
+          $casa = $env:E2E_HOME
+          $env:USERPROFILE = $casa
+          $env:HOME = $casa
+          $exe = Join-Path $casa '.cargo\bin\schematize-overdev.exe'
+          $saida = & $exe delegar --listar --json | Out-String
+          if ($LASTEXITCODE -ne 0) { throw "delegar --listar saiu com $LASTEXITCODE" }
+          $obj = $saida | ConvertFrom-Json
+          if ($null -eq $obj) { throw "JSON vazio: $saida" }
+          Write-Host $saida
