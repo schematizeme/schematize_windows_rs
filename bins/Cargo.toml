@@ -1,0 +1,35 @@
+[package]
+name = "bins"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Os executáveis Windows: schematize-market, schematize-overdev e schematize-overdev-gui."
+
+[[bin]]
+name = "schematize-market"
+path = "src/market.rs"
+
+[[bin]]
+name = "schematize-overdev"
+path = "src/overdev.rs"
+
+[[bin]]
+name = "schematize-overdev-gui"
+path = "src/overdev_gui.rs"
+required-features = ["gui"]
+
+[features]
+default = []
+# A janela do overdev (iced). Fora do `default` para o CI de lógica pura não compilar o toolkit.
+gui = ["overdev_casa/gui"]
+
+[dependencies]
+plataforma_windows = { path = "../plataforma_windows" }
+market_windows = { path = "../market_windows" }
+overdev_windows = { path = "../overdev_windows" }
+# TEMP(ADR-0026): trocar por git = "https://github.com/schematizeme/schematize_plataforma_rs", tag = "v0.2.1" ao publicar
+schematize_plataforma = { path = "../../schematize_plataforma_rs", features = ["base", "seams"] }
+# TEMP(ADR-0026): trocar por git = "https://github.com/schematizeme/schematize_market_rs", tag = "v0.6.0" ao publicar
+market = { package = "schematize-market", path = "../../schematize_market_rs" }
+# TEMP(ADR-0026): trocar por git = "https://github.com/schematizeme/schematize_overdev_rs", tag = "v0.4.0" ao publicar
+overdev_casa = { package = "schematize-overdev", path = "../../schematize_overdev_rs", default-features = false }
